@@ -15,12 +15,13 @@ transform = transforms.Compose([
 train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
 test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
 
-train_loader = DataLoader(dataset=train_dataset, batch_size=50000, shuffle=True)
-test_loader = DataLoader(dataset=test_dataset, batch_size=10000, shuffle=False)
+train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True)
+test_loader = DataLoader(dataset=test_dataset, batch_size=1000, shuffle=False)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model = SimpleConvNN().to(device)
-optimizer = MomentumSGD_Strong_Wolfe(model.parameters())
+# optimizer = MomentumSGD_Strong_Wolfe(model.parameters())
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 criterion = nn.CrossEntropyLoss()
 
 def train(model, device, train_loader, optimizer, epoch):
@@ -58,6 +59,6 @@ def test(model, device, test_loader):
     print(f'\nTest set: Average loss: {test_loss:.4f}, Accuracy: {correct}/{len(test_loader.dataset)}'
           f' ({100. * correct / len(test_loader.dataset):.0f}%)\n')
 
-for epoch in range(1, 11):
+for epoch in range(1, 2):
     train(model, device, train_loader, optimizer, epoch)
     test(model, device, test_loader)

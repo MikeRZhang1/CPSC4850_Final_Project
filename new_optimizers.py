@@ -2,8 +2,8 @@ import torch
 from torch.optim import Optimizer
 
 class MomentumSGD_Strong_Wolfe(Optimizer):
-    def __init__(self, params, lr=1.0, momentum=0.9, c1=1e-4, c2=0.9, 
-                 alpha_max=10.0, max_ls_iter=20):
+    def __init__(self, params, lr=0.01, momentum=0.9, c1=1e-4, c2=0.9, 
+                 alpha_max=0.1, max_ls_iter=100):
         defaults = dict(lr=lr, momentum=momentum, c1=c1, c2=c2,
                         alpha_max=alpha_max, max_ls_iter=max_ls_iter)
         super().__init__(params, defaults)
@@ -31,8 +31,8 @@ class MomentumSGD_Strong_Wolfe(Optimizer):
     def _phi_derivative(self, grad, d):
         return torch.dot(grad, d).item()
 
-    def _zoom(self, closure, x0, d, alo, ahi, phi0, der0, c1, c2):
-        for _ in range(20):
+    def _zoom(self, closure, x0, d, alo, ahi, phi0, der0, c1, c2, max_ls_iter):
+        for _ in range(max_ls_iter):
             aj = 0.5 * (alo + ahi)
             phi_j, g_j = self._phi(closure, x0, d, aj)
             if phi_j > phi0 + c1 * aj * der0:
@@ -60,7 +60,7 @@ class MomentumSGD_Strong_Wolfe(Optimizer):
                (phi_a >= phi_prev and _ > 0):
                 return self._zoom(closure, x0, d,
                                   alpha_prev, alpha,
-                                  phi0, der0, c1, c2)
+                                  phi0, der0, c1, c2, max_ls_iter)
 
             der_a = self._phi_derivative(g_a, d)
 
@@ -70,7 +70,7 @@ class MomentumSGD_Strong_Wolfe(Optimizer):
             if der_a >= 0:
                 return self._zoom(closure, x0, d,
                                   alpha, alpha_prev,
-                                  phi0, der0, c1, c2)
+                                  phi0, der0, c1, c2, max_ls_iter)
 
             alpha_prev = alpha
             phi_prev = phi_a
@@ -102,7 +102,7 @@ class MomentumSGD_Strong_Wolfe(Optimizer):
         der0 = torch.dot(g, d).item()
         alpha = self._strong_wolfe(
             closure, x0, d, phi0, der0,
-            c1, c2, alpha1, alpha_max
+            c1, c2, alpha1, alpha_max, max_ls_iter
         )
         new_x = x0 + alpha * d
         self._set_params_from_flat(new_x)
