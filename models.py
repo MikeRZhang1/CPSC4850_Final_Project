@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# for MNIST and Fashion-MNIST
+# for MNIST and Fashion-MNIST (didn't end up using these datasets)
 class SimpleConvNN(nn.Module):
     def __init__(self):
         super(SimpleConvNN, self).__init__()
@@ -45,4 +45,18 @@ class BiggerConvNN(nn.Module):
         x = self.flatten(x)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
+        return x
+
+# for wine quality regression
+class Wine_MLP(nn.Module):
+    def __init__(self, input_size):
+        super(MLP, self).__init__()
+        self.fc1 = nn.Linear(input_size, 64)
+        self.fc2 = nn.Linear(64, 32)
+        self.fc3 = nn.Linear(32, 1)
+    
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         return x

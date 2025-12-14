@@ -352,7 +352,7 @@ class TrustRegionCauchy(Optimizer):
         # trust-region update
         if rho < 0.25:
             r *= 0.25
-        elif rho > 0.75 and torch.linalg.norm(p) >= r:
+        elif rho > 0.75 and torch.linalg.norm(p) < r:
             r = min(2 * r, rmax)
 
         group["r_current"] = r
@@ -387,52 +387,77 @@ class Levenberg_Marquardt(Optimizer):
                 idx += numel
 
     def step(self, closure):
-        loss = closure(backward=False, lm=True)
+        with torch.enable_grad():
+            residuals = closure(lm=True)
+            loss = 0.5 * residuals.pow(2).sum()
+
         params = [p for group in self.param_groups for p in group['params']]
-        g_list = torch.autograd.grad(loss, params, create_graph=True)
+        g_list = torch.autograd.grad(residuals, params, grad_outputs=residuals, create_graph=True)
         g = torch.cat([gi.reshape(-1) for gi in g_list])
 
         group = self.param_groups[0]
-        lambda_ = group.get('lambda_', 10)    # LM parameter
+        lambda_ = group.get('lambda_', 10)
         max_landweber_iter = group.get('lw_iter', 10)
+        epsilon = 1e-4
 
-        # Hessian-vector product function
-        def H_GN_v(v):
-            Hv_list = torch.autograd.grad(
-                g, params, grad_outputs=v,
-                retain_graph=True, create_graph=False
-            )
-            return torch.cat([h.reshape(-1) for h in Hv_list])
-
+        # define matrix-vector product: A(v) = (J^T J + lambda*I)v
         def A_mv(v):
-            return H_GN_v(v) + lambda_ * v
+            # compute J*v (Directional Derivative) using 
+            # finite differences: Jv ≈ (R(params + eps*v) - R(params)) / eps
+            v_norm = v.norm()
+            if v_norm < 1e-12:
+                # If v is zero, Jv is zero.
+                Jv = torch.zeros_like(residuals)
+            else:
+                v_unit = v / v_norm
+                x_old = torch.cat([p.data.view(-1) for p in params])
+                x_new = x_old + epsilon * v_unit
+                self._set_params_from_flat(x_new)
+                with torch.no_grad():
+                    res_perturbed = closure(lm=True)
+                self._set_params_from_flat(x_old)
+                Jv = (res_perturbed - residuals) / epsilon
+  
+            # compute J^T * (Jv) using Autograd
+            JT_Jv_list = torch.autograd.grad(
+                residuals, params, 
+                grad_outputs=Jv, 
+                retain_graph=True
+            )
+            JT_Jv = torch.cat([j.reshape(-1) for j in JT_Jv_list])
 
-        # begin landweber workflow here
-        d0 = -g.clone()
-        d = d0.clone()
+            return (v_norm * JT_Jv) + (lambda_ * v)
+
+        # landweber algorithm
+        d = torch.zeros_like(g)
         with torch.no_grad():
-            # choose tau using approximation
-            Ad0 = A_mv(d0)
-            est = (Ad0.norm() / (d0.norm() + 1e-12)).item()
-            tau = min(1e-3, 1.0 / (est**2 + 1e-12))
-    
-            # run Landweber iteration
+            sigma_max = self._compute_spectral_norm(A_mv, g.shape[0], g.device)
+            # step size
+            tau = 1.0 / (sigma_max + 1e-12)
+
             for t in range(max_landweber_iter):
                 Ad = A_mv(d)
-                # print(f"iter {t}: ||d||={d.norm().item():.3e}, ||Ad||={Ad.norm().item():.3e}")
                 grad_lw = Ad + g            
-                d = d - tau * A_mv(grad_lw)
+                d = d - tau * grad_lw
+                
                 if torch.isnan(d).any():
                     raise ValueError("NaN encountered in Landweber iterations.")
 
-        # d is now the LM step
+        # apply update
         pk = d
-
-        # update parameters
         x0 = self._gather_flat_params()
         new_x = x0 + pk
         self._set_params_from_flat(new_x)
 
         return loss
 
+    # power iteration to compute spectral norm
+    def _compute_spectral_norm(self, A_mv, dim, device, n_iter=10):
+        v = torch.randn(dim).to(device)
+        v = v / torch.norm(v)
+        for _ in range(n_iter):
+            Av = A_mv(v)
+            v = Av / torch.norm(Av)
+        sigma = torch.dot(v, A_mv(v)).item()
+        return sigma
         
