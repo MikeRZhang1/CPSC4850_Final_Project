@@ -11,13 +11,13 @@ Specifically, this project explores:
 2.  **Trust-Region Methods:** Implementing a Trust-Region algorithm with Cauchy point updates in PyTorch.
 3.  **Non-linear Least Squares:** Adapting the Levenberg-Marquardt algorithm for neural network regression tasks.
 
-The results indicate that Strong Wolfe line search consistently improves convergence speed and out-of-sample performance for standard classification and regression tasks. While the second-order methods (Trust-Region and Levenberg-Marquardt) proved more complex to implement, they demonstrated remarkable stability and offer promising avenues for future research in robust model training.
+The results indicate that Strong Wolfe line search consistently improves convergence speed and out-of-sample performance for standard classification and regression tasks. While the second-order methods (Trust-Region and Levenberg-Marquardt) proved more complex to implement, they demonstrated adequate stability and offer promising avenues for future exploration.
 
 ---
 
 ## File Descriptions
 
-The project is organized into the following modules and notebooks:
+The project is organized into the following scripts and notebooks:
 
 ### Source Code
 * **`models.py`** Contains the PyTorch neural network architectures used for experimentation, including the Convolutional Neural Networks (CNNs) for image classification and the Multi-Layer Perceptron (MLP) for regression.
@@ -26,7 +26,7 @@ The project is organized into the following modules and notebooks:
     * `Adam_Strong_Wolfe`
     * `MomentumSGD_Strong_Wolfe`
     * `TrustRegion_Cauchy`
-    * `LevenbergMarquardt`
+    * `Levenberg_Marquardt`
 
 ### Experiments
 * **`img_classify.ipynb`** The primary notebook for the image classification task on the **CIFAR-100** dataset. This file contains the training loops, validation logic, and code to generate comparative plots (loss curves and accuracy metrics) for the different optimizers.
